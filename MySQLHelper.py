@@ -1,6 +1,7 @@
-from mysql.connector.connection import MySQLConnection
+import logging
+from typing import Optional, List, Dict
 from mysql.connector import pooling
-from typing import Optional
+from mysql.connector.connection import MySQLConnection
 
 
 class MySQLHelper(object):
@@ -22,6 +23,66 @@ class MySQLHelper(object):
     @staticmethod
     def connection_inst(**kwargs) -> MySQLConnection:
         return MySQLHelper.get_instance(**kwargs).get_connection()
+
+    @staticmethod
+    def update(query, data: Dict[str, str], with_commit: bool = True, with_rising: bool = True):
+        conn = MySQLHelper.connection_inst()
+        conn.connect()
+        cnx = None
+        try:
+            cnx = conn.cursor()
+            cnx.execute(query, data)
+            if with_commit:
+                conn.commit()
+        except Exception as e:
+            if conn.in_transaction:
+                conn.rollback()
+            logging.error(e)
+            if with_rising:
+                raise e
+        finally:
+            cnx = None
+            conn.close()
+            conn = None
+
+    @staticmethod
+    def update_many(query, data: List[Dict[str, str]], with_commit: bool = True, with_rising: bool = True):
+        conn = MySQLHelper.connection_inst()
+        conn.connect()
+        cnx = None
+        try:
+            cnx = conn.cursor()
+            cnx.executemany(query, data)
+            if with_commit:
+                conn.commit()
+        except Exception as e:
+            if conn.in_transaction:
+                conn.rollback()
+            logging.error(e)
+            if with_rising:
+                raise e
+        finally:
+            cnx = None
+            conn.close()
+            conn = None
+
+    @staticmethod
+    def fetch_all(query, params=None, with_rising: bool = True):
+        conn = MySQLHelper.connection_inst()
+        conn.connect()
+        cnx = None
+        try:
+            cnx = conn.cursor()
+            cnx.execute(query, params=params)
+            return [row for row in cnx.fetchall()]
+        except Exception as e:
+            logging.error(e)
+            if with_rising:
+                raise e
+        finally:
+            cnx = None
+            conn.close()
+            conn = None
 
     def __init__(self, **kwargs):
         self._init_kwargs(**kwargs)
